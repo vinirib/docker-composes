@@ -1,0 +1,15 @@
+version: '2'
+services:
+  beanstalkd-console:
+    image: schickling/beanstalkd-console:latest
+    ports:
+      - '2080:2080'
+    environment:
+      BEANSTALKD_HOST: localhost
+      BEANSTALKD_PORT: '11300'
+    stdin_open: true
+    tty: true
+  beanstalkd:
+    image: schickling/beanstalkd:latest
+    stdin_open: true
+    tty: true
