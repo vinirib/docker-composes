@@ -2,6 +2,9 @@ version: '3.1'
 services:
   database:
     image: sath89/oracle-12c:r1
+    build:
+      context: .
+      dockerfile: Dockerfile-Oracle
     container_name: oracle
     restart: always
     ports:

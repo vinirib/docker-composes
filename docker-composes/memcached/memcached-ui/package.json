@@ -1,0 +1,28 @@
+{
+  "name": "memcached-ui",
+  "version": "1.0.0",
+  "description": "memcached web client",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saada/memcached-ui.git"
+  },
+  "keywords": [
+    "memcached",
+    "gui",
+    "web",
+    "client"
+  ],
+  "author": "Mahmoud Saada",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/saada/memcached-ui/issues"
+  },
+  "homepage": "https://github.com/saada/memcached-ui#readme",
+  "dependencies": {
+    "memcached": "^2.2.1"
+  }
+}

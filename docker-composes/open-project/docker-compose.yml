@@ -1,21 +1,42 @@
 version: '3'
 services:
   openproject:
-    container_name: openproject
-    image: openproject/community:9.0
+    image: openproject/community:latest
     ports:
       - 8080:80
     volumes:
-      - ./openproject/static:/var/db/openproject
-      - ./openproject/logs:/var/log/supervisor
-      - ./openproject/pgdata:/var/lib/postgresql/9.6/main
+      - /op-data:/var/openproject/static:rw
     environment:
+      - DATABASE_URL=postgres://weesy:weesy9866892726@postgres:5432/openproject
       - SECRET_KEY_BASE=secret      
       - EMAIL_DELIVERY_METHOD="smtp"
       - SMTP_ADDRESS="smtp.mailgun.org"
       - SMTP_PORT="587"
-      - SMTP_DOMAIN="myDomain.com"
+      - SMTP_DOMAIN="weesy.com.br"
       - SMTP_AUTHENTICATION="plain"
       - SMTP_USER_NAME="postmaster@myDomain.com"
       - SMTP_PASSWORD="MyPassword"
       - SMTP_ENABLE_STARTTLS_AUTO="true"
+    depends_on:
+      - postgres
+    networks:
+      - default
+      
+  postgres:
+    image: postgres:9.6-alpine
+    networks:
+     - default
+    volumes:
+      - /db-data:/var/lib/postgresql/data:rw
+    environment:
+      - POSTGRES_DB=openproject
+      - POSTGRES_USER=weesy
+      - POSTGRES_PASSWORD=weesy9866892726
+    ports:
+     - "5432:5432"
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge

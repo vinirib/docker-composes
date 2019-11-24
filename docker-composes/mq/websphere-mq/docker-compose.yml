@@ -1,0 +1,24 @@
+version: '3'
+services:
+    mqseries:
+        image: ibmcom/mq
+        ports:
+            - "1414:1414"
+            - "9443:9443"
+        container_name: mqserver
+        environment:
+            - LICENSE=accept
+            - MQ_QMGR_NAME=JMQI.CTRL.BR.PEGASUS
+        volumes:
+            - mqseries-volume:/mnt/mqm
+        stdin_open: true
+        tty: true
+        restart: always
+#    COMMENTS WMQ
+#    Web Admin Console https://localhost:9443/ibmmq/console/
+#    user: admin
+#    password: passw0rd
+#    repository: https://github.com/ibm-messaging/mq-docker/blob/master/README.md
+volumes:
+    mqseries-volume:
+

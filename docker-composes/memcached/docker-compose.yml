@@ -1,0 +1,9 @@
+version: '3.5'
+
+services:
+   memcached:
+    build: .
+    ports:
+      - "11212:11211"
+      - "8000:80"
+    restart: always
