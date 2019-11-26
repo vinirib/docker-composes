@@ -1,0 +1,49 @@
+version: '3.5'
+
+services:
+  gitea:
+    container_name: gitea-app
+    restart: always
+    image: gitea/gitea:${GITEA_VERSION}
+    volumes:
+      - gitea_app:/data
+    ports:
+      - "${GITEA_SSH_PORT}:22"
+      - "${GITEA_WEB_PORT}:3000"
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - VIRTUAL_PORT=3000
+      - VIRTUAL_HOST=${GITEA_HOSTNAME}
+      - DB_TYPE=postgres
+      - DB_HOST="gitea-postgres:5432"
+      - DB_NAME=gitlea_production
+      - DB_USER=gitea
+      - DB_PASSWD=giteaKeypass9280
+      - APP_NAME=${APP_NAME}
+    networks:
+      - gitea
+            
+  gitea-postgres:
+    image: postgres:${POSTGRES_VERSION}
+    restart: always
+    container_name: gitea_postgresql
+    # https://github.com/docker-library/docs/tree/master/postgres#environment-variables
+    environment:
+      - POSTGRES_USER=gitea
+      - POSTGRES_PASSWORD=giteaKeypass9280
+      - POSTGRES_DB=gitlea_production
+      - PGDATA=/tmp
+    ports:
+      - "5432:5432"
+    volumes:
+      - "gitea_postgres:/var/lib/postgresql/data:rw"
+    restart: always
+    networks:
+      - gitea
+networks:
+  gitea:
+
+volumes:
+  gitea_app:
+  gitea_postgres:

@@ -1,0 +1,144 @@
+version: '3.5'
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:${GITLAB_CE_VERSION}
+    restart: always
+    container_name: gitlab
+    hostname: "${GITLAB_HOST}"
+    links:
+      - postgres:postgres
+      - redis:redis
+    environment:
+      # edit hosts file to add dns name
+      # Windows: C:\Windows\System32\drivers\etc
+      # linux: /etc/hosts
+      # url address https://docker.gitlab:30080
+      # Default user root
+      GITLAB_OMNIBUS_CONFIG: |
+        # Add gitlab.rb configuration here, each on its own line.
+        # See: https://gitlab.com/gitlab-org/omnibus-gitlab/blob/master/files/gitlab-config-template/gitlab.rb.template
+        external_url 'https://${GITLAB_HOST}:30080'
+        gitlab_rails['gitlab_shell_ssh_port'] = 30022
+        gitlab_rails['time_zone'] = 'America/Sao_Paulo'
+        postgresql['enable'] = false
+        redis['enable'] = false
+        # Configure headers for outgoing email.
+        gitlab_rails['gitlab_email_enabled'] = true
+        gitlab_rails['gitlab_email_from'] = 'no-reply@${GITLAB_HOST}'
+        gitlab_rails['gitlab_email_display_name'] = 'GitLab'
+        gitlab_rails['gitlab_email_reply_to'] = 'no-reply@${GITLAB_HOST}'
+        # Send outgoing email via the SMTP container:
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "mail"
+        gitlab_rails['smtp_port'] = 25
+        gitlab_rails['smtp_tls'] = false
+        # Limit backup lifetime to 7 days (604800 seconds):
+        gitlab_rails['backup_keep_time'] = 604800
+        gitlab_rails['db_username'] = "gitlab"
+        gitlab_rails['db_password'] = "gitlabKeypass9280"
+        gitlab_rails['db_host'] = "postgres"
+        gitlab_rails['db_port'] = "5432"
+        gitlab_rails['db_database'] = "gitlabhq_production"
+        gitlab_rails['db_adapter'] = 'postgresql'
+        gitlab_rails['db_pool'] = 10
+        gitlab_rails['db_encoding'] = 'utf8'
+        redis['enable'] = false
+        gitlab_rails['redis_host'] = 'redis'
+        gitlab_rails['redis_port'] = '6379'
+    ports:
+      - "30080:30080"
+      - "30022:22"
+    volumes:
+      - 'gitlab:/etc/gitlab:rw'
+      - 'gitlab-logs:/var/log/gitlab:rw'
+      - 'gitlab-data:/var/opt/gitlab:rw'
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - default
+      - nginx_proxy
+
+  pages:
+    image: gitlab/gitlab-ce:${GITLAB_CE_VERSION}
+    restart: always
+    container_name: gitlab_pages
+    hostname: "${PAGES_HOST}-runner"
+    environment:
+      - TZ=${TZ}
+      - VIRTUAL_HOST=${PAGES_HOST},*.${PAGES_HOST}
+      - VIRTUAL_PORT=8090
+      - HTTPS_METHOD=nohttps
+      # - LETSENCRYPT_HOST=${PAGES_HOST}
+      # - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    expose:
+      - 8090/tcp
+    entrypoint:
+      - /opt/gitlab/embedded/bin/gitlab-pages
+    command:
+      - -listen-proxy
+      - "0.0.0.0:8090"
+      - -pages-domain
+      - "${PAGES_HOST}"
+      - -pages-root
+      - "/var/opt/gitlab/gitlab-rails/shared/pages"
+    volumes:
+      - './volumes/data/gitlab-pages:/var/opt/gitlab/gitlab-pages:rw'
+      - './volumes/data/gitlab-rails/shared/pages:/var/opt/gitlab/gitlab-rails/shared/pages:ro'
+    networks:
+      - nginx_proxy
+
+  runner:
+    image: gitlab/gitlab-runner:${GITLAB_RUNNER_VERSION}
+    restart: always
+    container_name: gitlab_runner
+    environment:
+      - CI_SERVER_URL=https://${GITLAB_HOST}/
+    volumes:
+      - "runner:/etc/gitlab-runner:rw"
+      - "/var/run/docker.sock:/var/run/docker.sock:rw"
+
+  postgres:
+    image: postgres:${POSTGRES_VERSION}
+    restart: always
+    container_name: gitlab_postgresql
+    # https://github.com/docker-library/docs/tree/master/postgres#environment-variables
+    environment:
+      - POSTGRES_USER=gitlab
+      - POSTGRES_PASSWORD=gitlabKeypass9280
+      - POSTGRES_DB=gitlabhq_production
+      - PGDATA=/tmp
+    ports:
+      - "5432:5432"
+    volumes:
+      - "postgres:/var/lib/postgresql/data:rw"
+    restart: always
+
+  redis:
+    image: redis:${REDIS_VERSION}
+    restart: always
+    container_name: gitlab_redis
+    command:
+      - --loglevel warning
+    volumes:
+      - "gitlab-redis:/var/lib/redis:rw"
+    restart: always
+    
+  # This allows GitLab to send email straight out of the box without
+  # having to rely on an external provider like SendGrid or MailGun.
+  # It makes an SMTP host available at the hostname "mail".   
+  mail:
+    image: bytemark/smtp
+    restart: always
+
+volumes:
+  postgres:
+  runner:
+  gitlab:
+  gitlab-logs:
+  gitlab-data:
+  gitlab-redis:
+
+networks:
+  nginx_proxy:
+      name: ${NGINX_PROXY_NETWORK_NAME}
