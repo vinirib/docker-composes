@@ -1,13 +1,11 @@
-version: '3.5'
-
 services:
   postgres:
     container_name: postgres_container
-    image: postgres
+    image: postgres:15.3-alpine
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: pizzaria
+      POSTGRES_USER: ${DB_USER?MISSING VARIABLE}
+      POSTGRES_PASSWORD: ${DB_PASS?MISSING VARIABLE}
+      POSTGRES_DB: ${DB_NAME?MISSING VARIABLE}
       PGDATA: /data/postgres
     volumes:
        - /postgres:/data/postgres
