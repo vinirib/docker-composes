@@ -1,0 +1,43 @@
+services:
+  mongodb1:
+    image: mongo:7.0.5-jammy
+    container_name: mongodb1
+    restart: on-failure
+    ports:
+      - "27017:27017"
+    networks:
+      - sc-platform
+    volumes:
+      - mongodata1:/data/db
+    command: [
+      "--replSet", "rsmongo",
+      "--bind_ip_all",
+      "--wiredTigerCacheSizeGB", "0.25",
+      "--wiredTigerJournalCompressor", "snappy",
+      "--wiredTigerCollectionBlockCompressor", "snappy",
+      "--wiredTigerIndexPrefixCompression", "true",
+      "--quiet"
+    ]
+
+  mongosetup:
+    build:
+      context: ./mongo-setup
+      args:
+        - ROOT_MONGODB_USER=${ROOT_MONGODB_USER}
+        - ROOT_MONGODB_PASSWORD=${ROOT_MONGODB_PASSWORD}
+        - SC_MONGODB_USER=${SC_MONGODB_USER}
+        - SC_MONGODB_PASSWORD=${SC_MONGODB_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+    container_name: "mongosetup"
+    networks:
+      - sc-platform
+    environment:
+      - ROOT_MONGODB_USER=${ROOT_MONGODB_USER}
+      - ROOT_MONGODB_PASSWORD=${ROOT_MONGODB_PASSWORD}
+      - SC_MONGODB_USER=${SC_MONGODB_USER}
+      - SC_MONGODB_PASSWORD=${SC_MONGODB_PASSWORD}
+    depends_on:
+      - mongodb1

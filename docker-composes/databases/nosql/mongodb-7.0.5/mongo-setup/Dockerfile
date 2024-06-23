@@ -1,0 +1,21 @@
+FROM mongo:7.0.5-jammy
+
+ARG ROOT_MONGODB_USER
+ARG ROOT_MONGODB_PASSWORD
+ARG SC_MONGODB_USER
+ARG SC_MONGODB_PASSWORD
+
+ENV ROOT_MONGODB_USER=$ROOT_MONGODB_USER
+ENV ROOT_MONGODB_PASSWORD=$ROOT_MONGODB_PASSWORD
+ENV SC_MONGODB_USER=$SC_MONGODB_USER
+ENV SC_MONGODB_PASSWORD=$SC_MONGODB_PASSWORD
+
+RUN mkdir /config && \
+    chmod 755 /config
+
+WORKDIR /config
+
+COPY wait-for-it.sh .
+COPY mongo-setup.sh .
+RUN chmod +x *.sh
+CMD [ "bash", "-c", "./wait-for-it.sh mongodb1:27017 -- ./mongo-setup.sh"]
