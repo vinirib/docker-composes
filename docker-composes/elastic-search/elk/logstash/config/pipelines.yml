@@ -1,0 +1,11 @@
+# - pipeline.id: postgres_ad_login
+#   path.config: "/usr/share/logstash/pipeline/postgres/ad_login.conf"
+
+# - pipeline.id: postgres_ad_application
+#   path.config: "/usr/share/logstash/pipeline/postgres/ad_application.conf"
+
+# - pipeline.id: mongo_sc_login
+#   path.config: "/usr/share/logstash/pipeline/mongodb/mongo_sc_login.conf"
+
+# - pipeline.id: mongo_endpoint_access
+#   path.config: "/usr/share/logstash/pipeline/mongodb/mongo_endpoint_access.conf"

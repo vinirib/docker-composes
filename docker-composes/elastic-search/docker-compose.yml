@@ -1,0 +1,90 @@
+services:
+  personal-setup-elk:
+    build:
+      context: elk/setup-elk/
+      args:
+        ELASTIC_VERSION: 8.13.2
+    init: true
+    volumes:
+      - ./elk/setup-elk/entrypoint.sh:/entrypoint.sh:ro,Z
+      - ./elk/setup-elk/lib.sh:/lib.sh:ro,Z
+      - ./elk/setup-elk/roles:/roles:ro,Z
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD?Environment variable missing}
+      LOGSTASH_INTERNAL_PASSWORD: ${LOGSTASH_INTERNAL_PASSWORD?Environment variable missing}
+      KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD?Environment variable missing}
+    networks:
+      - personal-elastic-search
+    depends_on:
+      - personal-elasticsearch
+
+  personal-elasticsearch:
+    build:
+      context: elk/elasticsearch/
+      args:
+        ELASTIC_VERSION: 8.13.2
+    volumes:
+      - ./elk/elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,Z
+      - personal-elasticsearch:/usr/share/elasticsearch/data:Z
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      node.name: elasticsearch
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD?Environment variable missing}
+      discovery.type: single-node
+    networks:
+      - personal-elastic-search
+    restart: unless-stopped
+
+  personal-logstash:
+    build:
+      context: elk/logstash/
+      args:
+        ELASTIC_VERSION: 8.13.2
+    volumes:
+      - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro,Z
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro,Z
+      # - ./elk/logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro,Z
+    ports:
+      - 5044:5044
+      - 50000:50000
+      - 9600:9600
+    environment:
+#      LS_JAVA_OPTS: -Xms256m -Xmx256m
+      LOGSTASH_INTERNAL_PASSWORD: ${LOGSTASH_INTERNAL_PASSWORD?Environment variable missing}
+      LOGSTASH_SCHEDULE: ${LOGSTASH_SCHEDULE?Environment variable missing}
+      SC_PGSQL_PASSWORD: ${SC_PGSQL_PASSWORD?Environment variable missing}
+    networks:
+      - personal-elastic-search
+    depends_on:
+      - personal-setup-elk
+      - personal-elasticsearch
+    restart: unless-stopped
+
+  personal-kibana:
+    build:
+      context: elk/kibana/
+      args:
+        ELASTIC_VERSION: 8.13.2
+    volumes:
+      - ./elk/kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro,Z
+    ports:
+      - 5601:5601
+    environment:
+      KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD?Environment variable missing}
+      KIBANA_XPACK_ENCRYPTION_KEY: ${KIBANA_XPACK_ENCRYPTION_KEY?Environment variable missing}
+    networks:
+      - personal-elastic-search
+    depends_on:
+      - personal-elasticsearch
+      - personal-setup-elk
+    restart: unless-stopped
+
+
+volumes:
+  personal-elasticsearch: {}
+
+networks:
+  personal-elastic-search:
