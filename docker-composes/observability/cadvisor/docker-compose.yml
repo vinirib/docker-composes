@@ -1,0 +1,36 @@
+services:
+  #This only works on Linux environments
+  cadvisor:
+    image: google/cadvisor:v0.33.0
+    privileged: true
+    ports:
+      - 8085:8080
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - sc-platform
+  #This is for m1/m2 test
+#  cadvisor:
+#    profiles:
+#      - "all"
+#      - "pipeline-minimal"
+#    image: gcr.io/cadvisor/cadvisor:v0.47.1 # m1/m2 mac
+#    privileged: true # stops oom warning
+#    platform: linux/aarch64 # m1/m2 mac
+#    devices:
+#      - /dev/kmsg:/dev/kmsg
+#    volumes:
+#      - /var/run:/var/run:ro
+#      - /sys:/sys:ro
+#      - /var/lib/docker/:/var/lib/docker:ro
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#      - /etc/machine-id:/etc/machine-id:ro
+#      - /var/lib/dbus/machine-id:/var/lib/dbus/machine-id:ro
+#    ports:
+#      - 8085:8080
+#    networks:
+#      - sc-platform
+

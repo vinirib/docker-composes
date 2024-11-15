@@ -1,0 +1,247 @@
+
+//appointments visits and no show, aggregated by time
+db.ma.aggregate([
+    {
+        // Unwind the array to flatten documents (if any arrays exist)
+        $unwind: {
+            path: "$fhirResource"
+        }
+    },
+    {
+        // Filter out documents without the status or start date
+        $match: {
+            "fhirResource.status": { $exists: true },
+            "fhirResource.start": { $exists: true }
+        }
+    },
+    {
+        // Project the needed fields and convert the start date to year and month
+        $project: {
+            status: "$fhirResource.status",
+            yearMonth: { $dateToString: { format: "%Y-%m", date: { $dateFromString: { dateString: "$fhirResource.start" } } } }
+        }
+    },
+    {
+        // Group by the year-month and status, and count occurrences
+        $group: {
+            _id: {
+                status: "$status",
+                yearMonth: "$yearMonth"
+            },
+            count: { $sum: 1 }
+        }
+    },
+    {
+        // Sort by year-month for better visualization in Grafana
+        $sort: { "_id.yearMonth": 1 }
+    },
+    {
+        // Optionally reshape the output for easier use in Grafana (optional)
+        $project: {
+            _id: 0,
+            yearMonth: "$_id.yearMonth",
+            status: "$_id.status",
+            count: 1
+        }
+    }
+]);
+
+// second version, adding timestamp to being able to use on grafana as timestamp
+
+db.getSiblingDB('sc_fhir').Appointment.aggregate([
+    {
+        $unwind: "$fhirResource"
+    },
+    {
+        $match: {
+            "fhirResource.status": { $exists: true },
+            "fhirResource.start": { $exists: true }
+        }
+    },
+    {
+        $project: {
+            status: "$fhirResource.status",
+            yearMonth: {
+                $dateToString: {
+                    format: "%Y-%m",
+                    date: { $dateFromString: { dateString: "$fhirResource.start" } }
+                }
+            }
+        }
+    },
+    {
+        $group: {
+            _id: { status: "$status", yearMonth: "$yearMonth" },
+            count: { $sum: 1 }
+        }
+    },
+    {
+        $sort: { "_id.yearMonth": 1 }
+    },
+    {
+        $addFields: {
+            timestamp: {
+                $dateFromString: {
+                    dateString: { $concat: ["$_id.yearMonth", "-01T00:00:00"] },
+                    format: "%Y-%m-%dT%H:%M:%S"
+                }
+            }
+        }
+    },
+    {
+        $project: {
+            _id: 0,
+            status: "$_id.status",
+            yearMonth: "$_id.yearMonth",
+            count: "$count",
+            timestamp: "$timestamp"
+        }
+    }
+])
+
+// Encounters and Procedures graph
+db.getSiblingDB('sc_fhir').Encounter.aggregate([
+  {
+    $match: {
+      "fhirResource.period.start": { $exists: true }
+    }
+  },
+  {
+    $project: {
+      month: {
+        $dateToString: {
+          format: "%Y-%m",
+          date: { $dateFromString: { dateString: "$fhirResource.period.start" } }
+        }
+      }
+    }
+  },
+  {
+    $group: {
+      _id: "$month",
+      encounterCount: { $sum: 1 }
+    }
+  },
+  {
+    $sort: { "_id": 1 }
+  },
+  {
+    $project: {
+      _id: 0,
+      month: "$_id",
+      encounterCount: 1
+    }
+  }
+])
+
+
+//procedures
+db.getSiblingDB('sc_fhir').Procedure.aggregate([
+  {
+    $match: {
+      "fhirResource.performedPeriod.start": { $exists: true }
+    }
+  },
+  {
+    $project: {
+      month: {
+        $dateToString: {
+          format: "%Y-%m",
+          date: { $dateFromString: { dateString: "$fhirResource.performedPeriod.start" } }
+        }
+      }
+    }
+  },
+  {
+    $group: {
+      _id: "$month",
+      procedureCount: { $sum: 1 }
+    }
+  },
+  {
+    $sort: { "_id": 1 }
+  },
+  {
+    $project: {
+      _id: 0,
+      month: "$_id",
+      procedureCount: 1
+    }
+  }
+])
+
+// Top procedures
+db.getSiblingDB('sc_fhir').Procedure.aggregate([
+    {
+        $unwind: "$fhirResource.code.coding"
+    },
+    {
+        $group: {
+            _id: "$fhirResource.code.coding.display",  // Group by the display name of the procedure
+            procedureCount: { $sum: 1 }  // Count occurrences of each procedure
+        }
+    },
+    {
+        $sort: { procedureCount: -1 }  // Sort by count in descending order to get top procedures
+    },
+    {
+        $limit: 5  // Limit to the top 5 procedures
+    },
+    {
+        $project: {
+            _id: 0,
+            procedureName: "$_id",
+            procedureCount: 1
+        }
+    }
+])
+
+// Gap average
+db.getSiblingDB('sc_fhir').Measure.aggregate([
+    {
+        $match: {
+            "fhirResource.definition": { $exists: true }
+        }
+    },
+    {
+        $project: {
+            title: "$fhirResource.title",  // Include the title field in the output
+            definitionArray: {
+                $function: {
+                    body: "function(definition) { return JSON.parse(definition); }",
+                    args: [ "$fhirResource.definition" ],
+                    lang: "js"
+                }
+            }
+        }
+    },
+    {
+        $unwind: "$definitionArray"
+    },
+    {
+        $project: {
+            title: 1,  // Keep the title for grouping later
+            "level": "$definitionArray.level",
+            "value": {
+                $convert: {
+                    input: "$definitionArray.Value",
+                    to: "double",
+                    onError: null
+                }
+            }
+        }
+    },
+    {
+        $group: {
+            _id: "$title",  // Group by the title field now
+            averageGap: { $avg: "$value" }
+        }
+    },
+    {
+        $project: {
+            _id: 0,
+            title: "$_id",
+            averageGap: 1
+        }
+    }
+])
