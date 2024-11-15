@@ -1,0 +1,19 @@
+services:
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: grafana
+    ports:
+      - 3001:3000
+    restart: unless-stopped
+    networks:
+      - sc-platform
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./config/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+#      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/dashboard_provisioning.yml:/etc/grafana/provisioning/dashboards/dashboard_provisioning.yml
+      - ./dashboards:/etc/grafana/provisioning/dashboards
+volumes:
+  prom_data:

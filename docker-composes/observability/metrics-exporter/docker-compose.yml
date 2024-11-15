@@ -1,0 +1,44 @@
+services:
+  postgres-exporter:
+    image: wrouesnel/postgres_exporter:v0.8.0
+    restart: unless-stopped
+    networks:
+      - sc-platform
+    ports:
+      - 9187:9187
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${SC_PGSQL_USER}:${SC_PGSQL_PASSWORD_DECODED}@pgsql:5432/sc_admin?sslmode=disable
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    volumes:
+      - './postgres/queries.yaml:/etc/postgres_exporter/queries.yaml'
+
+  mongodb-exporter:
+    image: bitnami/mongodb-exporter:0.41.1
+    restart: unless-stopped
+    networks:
+      - sc-platform
+    ports:
+      - 9216:9216
+    environment:
+      - MONGODB_USER=${SC_MONGODB_USER?Environment variable missing}
+      - MONGODB_PASSWORD=${SC_MONGODB_PASSWORD?Environment variable missing}
+      - MONGODB_URI=mongodb://${SC_MONGODB_USER}:${SC_MONGODB_PASSWORD_DECODED}@mongodb1:27017
+#      - MONGODB_COLSTATS_COLL=sc_fhir,sc_login,sc_importer,sc_actionplan
+    command:
+      - --compatible-mode
+      - --discovering-mode
+      - --collect-all
+
+
+  mongodb-query-exporter:
+    image: raffis/mongodb-query-exporter:v1.0.0
+    restart: unless-stopped
+    networks:
+      - sc-platform
+    ports:
+      - 9412:9412
+    environment:
+      - MDBEXPORTER_MONGODB_URI=mongodb://${SC_MONGODB_USER}:${SC_MONGODB_PASSWORD_DECODED}@mongodb1:27017
+      - CONFIG_PATH=/etc/mongodb-query-exporter/config.yaml
+    volumes:
+      - './mongodb/config.yaml:/etc/mongodb-query-exporter/config.yaml'

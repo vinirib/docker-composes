@@ -1,0 +1,210 @@
+#Documentation https://github.com/raffis/mongodb-query-exporter
+version: 3.0
+bind: 0.0.0.0:9412
+log:
+  encoding: json
+  level: info
+  development: false
+  disableCaller: false
+global:
+  queryTimeout: 3s
+  maxConnection: 3
+  defaultCache: 0
+servers:
+  - name: main
+    uri: mongodb://${SC_MONGODB_USER}:${SC_MONGODB_PASSWORD_DECODED}@mongodb1:27017
+aggregations:
+  - database: sc_login
+    collection: Login
+    servers: [main]
+    metrics:
+      - name: login_document_count
+        type: gauge
+        help: 'The total number of documents in the Login collection'
+        value: total
+        overrideEmpty: true
+        emptyValue: 0
+        labels: []
+        constLabels: {}
+    mode: pull
+    pipeline: |
+      [
+        { "$count": "total" }
+      ]
+  - database: sc_fhir
+    collection: Appointment
+    servers: [main]
+    metrics:
+      - name: biodatai_appointments_metrics
+        type: gauge
+        help: 'The total number of appointments aggregated by status and month'
+        value: count
+        overrideEmpty: true
+        emptyValue: 0
+        labels: ["status", "yearMonth"]
+        constLabels: {}
+    mode: pull
+    pipeline: |
+      [
+        { "$unwind": "$fhirResource" },
+        { "$match": { "fhirResource.status": { "$exists": true }, "fhirResource.start": { "$exists": true } } },
+        { "$project": {
+            "status": "$fhirResource.status",
+            "yearMonth": { "$dateToString": { "format": "%Y-%m", "date": { "$dateFromString": { "dateString": "$fhirResource.start" } } } }
+        }},
+        { "$group": {
+            "_id": { "status": "$status", "yearMonth": "$yearMonth" },
+            "count": { "$sum": 1 }
+        }},
+        { "$sort": { "_id.yearMonth": 1 } },
+        { "$addFields": {
+            "timestamp": {
+              "$dateFromString": {
+                "dateString": { "$concat": ["$_id.yearMonth", "-01T00:00:00"] },
+                "format": "%Y-%m-%dT%H:%M:%S"
+              }
+            }
+        }},
+        { "$project": {
+            "_id": 0,
+            "status": "$_id.status",
+            "yearMonth": "$_id.yearMonth",
+            "count": "$count",
+            "timestamp": "$timestamp"
+        }}
+      ]
+  - database: sc_fhir
+    collection: Encounter
+    servers: [ main ]
+    metrics:
+      - name: biodatai_encounters_metrics
+        type: gauge
+        help: 'The total number of encounters aggregated by month'
+        value: encounterCount
+        overrideEmpty: true
+        emptyValue: 0
+        labels: [ "month" ] # Dynamic label for month
+        constLabels: { }
+    mode: pull
+    pipeline: |
+      [
+        { "$match": { "fhirResource.period.start": { "$exists": true } } },
+        { "$project": {
+            "month": { "$dateToString": { "format": "%Y-%m", "date": { "$dateFromString": { "dateString": "$fhirResource.period.start" } } } }
+        }},
+        { "$group": {
+            "_id": "$month",
+            "encounterCount": { "$sum": 1 }
+        }},
+        { "$sort": { "_id": 1 } },
+        { "$project": {
+            "_id": 0,
+            "month": "$_id",
+            "encounterCount": 1
+        }}
+      ]
+  - database: sc_fhir
+    collection: Procedure
+    servers: [ main ]
+    metrics:
+      - name: biodatai_procedures_metrics
+        type: gauge
+        help: 'The total number of procedures aggregated by month'
+        value: procedureCount
+        overrideEmpty: true
+        emptyValue: 0
+        labels: [ "month" ] # Dynamic label for month
+        constLabels: { }
+    mode: pull
+    pipeline: |
+      [
+        { "$match": { "fhirResource.performedPeriod.start": { "$exists": true } } },
+        { "$project": {
+            "month": { "$dateToString": { "format": "%Y-%m", "date": { "$dateFromString": { "dateString": "$fhirResource.performedPeriod.start" } } } }
+        }},
+        { "$group": {
+            "_id": "$month",
+            "procedureCount": { "$sum": 1 }
+        }},
+        { "$sort": { "_id": 1 } },
+        { "$project": {
+            "_id": 0,
+            "month": "$_id",
+            "procedureCount": 1
+        }}
+      ]
+  - database: sc_fhir
+    collection: Procedure
+    servers: [ main ]
+    metrics:
+      - name: biodatai_top_procedures_metrics
+        type: gauge
+        help: 'Top 5 most frequent procedures aggregated by procedure name'
+        value: procedureCount
+        overrideEmpty: true
+        emptyValue: 0
+        labels: [ "procedureName" ]
+        constLabels: { }
+    mode: pull
+    pipeline: |
+      [
+        { "$unwind": "$fhirResource.code.coding" },
+        { "$group": {
+            "_id": "$fhirResource.code.coding.display",
+            "procedureCount": { "$sum": 1 }
+        }},
+        { "$sort": { "procedureCount": -1 }},
+        { "$limit": 5 },
+        { "$project": {
+            "_id": 0,
+            "procedureName": "$_id",
+            "procedureCount": 1
+        }}
+      ]
+  - database: sc_fhir
+    collection: Measure
+    servers: [ main ]
+    metrics:
+      - name: biodatai_gap_average_metrics
+        type: gauge
+        help: 'Average gap value for each measure, grouped by title'
+        value: averageGap
+        overrideEmpty: true
+        emptyValue: 0
+        labels: [ "title" ]
+        constLabels: { }
+    mode: pull
+    pipeline: |
+      [
+        { "$match": { "fhirResource.definition": { "$exists": true } } },
+        { "$project": {
+            "title": "$fhirResource.title",
+            "definitionArray": { 
+              "$function": {
+                "body": "function(definition) { return JSON.parse(definition); }",
+                "args": [ "$fhirResource.definition" ],
+                "lang": "js"
+              }
+            }
+        }},
+        { "$unwind": "$definitionArray" },
+        { "$project": {
+            "title": 1,
+            "value": {
+              "$convert": {
+                "input": "$definitionArray.Value",
+                "to": "double",
+                "onError": null
+              }
+            }
+        }},
+        { "$group": {
+            "_id": "$title",
+            "averageGap": { "$avg": "$value" }
+        }},
+        { "$project": {
+            "_id": 0,
+            "title": "$_id",
+            "averageGap": 1
+        }}
+      ]
